@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Telegram Mini App script -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <title>Admin Panel (Firebase)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        /* Modern, Spotify/Android-like Dark Theme CSS */
+        :root {
+            --primary-color: #1DB954; /* Spotify Green */
+            --secondary-color: #282828; /* Dark Gray (Card/Surface) */
+            --background-color: #121212; /* Very Dark Background */
+            --text-color: #FFFFFF;
+            --text-secondary: #B3B3B3;
+            --danger-color: #FF4D4D;
+        }
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            padding-bottom: 70px; /* Space for the bottom navigation */
+            line-height: 1.6;
+        }
+        header { background-color: var(--secondary-color); padding: 15px 20px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5); text-align: center; }
+        h1 { font-weight: 700; font-size: 1.5rem; margin: 0; }
+        .container { padding: 20px; max-width: 800px; margin: 0 auto; }
+        .filter-bar { display: flex; gap: 10px; margin-bottom: 15px; overflow-x: auto; padding-bottom: 5px; }
+        .filter-bar button { background-color: #333; color: var(--text-secondary); border: none; padding: 8px 15px; border-radius: 20px; cursor: pointer; font-size: 0.9rem; flex-shrink: 0; transition: background-color 0.2s, color 0.2s; }
+        .filter-bar button.active { background-color: var(--primary-color); color: var(--background-color); }
+        .user-item { background-color: var(--secondary-color); padding: 15px; margin-bottom: 10px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; transition: background-color 0.2s; border-left: 5px solid transparent; }
+        .user-item.expired { background-color: #331f1f; border-left-color: var(--danger-color); }
+        .user-item.valid { border-left-color: var(--primary-color); }
+        .user-item-info { flex-grow: 1; min-width: 0; /* Fix for overflow */ }
+        .user-item-info strong { display: block; font-size: 1.1rem; color: var(--primary-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .user-item.expired .user-item-info strong { color: var(--danger-color); }
+        .user-item-info span { color: var(--text-secondary); font-size: 0.9rem; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .user-status-tag { background-color: var(--primary-color); color: var(--background-color); padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; margin-right: 15px; flex-shrink: 0; }
+        .user-item.expired .user-status-tag { background-color: var(--danger-color); color: var(--text-color); }
+        .user-actions { display: flex; gap: 10px; flex-shrink: 0; }
+        .date-shortcuts { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; padding-bottom: 5px; }
+        .date-shortcuts button { background-color: #333; color: var(--text-secondary); border: none; padding: 8px 10px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; flex-shrink: 0; transition: background-color 0.2s; }
+        .date-shortcuts button:hover { background-color: #444; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-size: 0.9rem; color: var(--text-secondary); }
+        input[type="text"], input[type="url"], input[type="date"], input[type="password"], textarea { width: 100%; padding: 10px; border: 1px solid #444; border-radius: 6px; background-color: #333; color: var(--text-color); box-sizing: border-box; }
+        .toggle-switch { position: relative; display: inline-block; width: 48px; height: 24px; vertical-align: middle; flex-shrink: 0; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 24px; }
+        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--primary-color); }
+        input:checked + .slider:before { transform: translateX(24px); }
+        .toggle-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #333; }
+        .toggle-row label { margin-bottom: 0; }
+        .action-btn { background: none; border: none; color: var(--text-secondary); font-size: 1.2rem; cursor: pointer; padding: 5px; border-radius: 50%; transition: color 0.2s; }
+        .action-btn:hover { color: var(--text-color); }
+        .delete-btn { color: var(--danger-color); }
+        nav { position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background-color: var(--secondary-color); display: flex; justify-content: space-around; align-items: center; box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.3); z-index: 1000; }
+        .nav-item { text-decoration: none; color: var(--text-secondary); display: flex; flex-direction: column; align-items: center; font-size: 0.7rem; transition: color 0.2s; cursor: pointer; padding: 5px 10px; }
+        .nav-item i { font-size: 1.5rem; margin-bottom: 2px; }
+        .nav-item.active { color: var(--primary-color); }
+        .add-user-btn { background-color: var(--primary-color); color: var(--background-color); width: 56px; height: 56px; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 2rem; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3); cursor: pointer; transform: translateY(-15px); transition: background-color 0.2s; }
+        .add-user-btn:hover { background-color: #1ed760; }
+        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.8); display: none; justify-content: center; align-items: center; z-index: 2000; overflow-y: auto; padding: 20px 0; }
+        .modal-content { background-color: var(--secondary-color); padding: 30px; border-radius: 12px; width: 90%; max-width: 450px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5); margin: 50px auto; }
+        .modal h2 { margin-top: 0; color: var(--primary-color); }
+        .modal button { padding: 10px 15px; border: none; border-radius: 6px; cursor: pointer; font-weight: 700; transition: opacity 0.2s; }
+        .modal button:hover { opacity: 0.9; }
+        .modal .btn-primary { background-color: var(--primary-color); color: var(--background-color); }
+        .modal .btn-secondary { background-color: #444; color: var(--text-color); margin-right: 10px; }
+        #loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.9); color: var(--primary-color); display: none; justify-content: center; align-items: center; font-size: 1.5rem; z-index: 3000; }
+        .toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background-color: rgba(30,30,30,0.9); border: 1px solid var(--secondary-color); color: var(--text-color); padding: 10px 20px; border-radius: 20px; opacity: 0; transition: opacity 0.3s; z-index: 4000; font-size: 0.9rem; }
+        .toast.show { opacity: 1; }
+        
+        /* Custom Modal for Confirmation */
+        .confirm-modal-content {
+            background-color: var(--secondary-color);
+            padding: 20px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 300px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            text-align: center;
+        }
+        .confirm-modal-content p {
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+            font-size: 1rem;
+        }
+        .confirm-buttons {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .confirm-buttons button {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 700;
+        }
+        .btn-confirm-danger { background-color: var(--danger-color); color: var(--text-color); }
+        .btn-confirm-secondary { background-color: #444; color: var(--text-color); }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>👑By Nazmul Reddy👑</h1>
+    </header>
+
+    <div class="container">
+        <!-- Users Tab -->
+        <div id="usersTab" class="tab-content">
+            <h2>User Keys</h2>
+            <div class="filter-bar" id="filterBar">
+                <button class="active" data-filter="all" onclick="setFilter('all', this)">All</button>
+                <button data-filter="valid" onclick="setFilter('valid', this)">Valid</button>
+                <button data-filter="expired" onclick="setFilter('expired', this)">Expired</button>
+            </div>
+            <div id="userList"></div>
+        </div>
+
+        <!-- Settings Tab (Updated for my.json structure) -->
+        <div id="settingsTab" class="tab-content" style="display: none;">
+            <h2>Global Settings</h2>
+
+            <div class="section-group" style="background-color: var(--secondary-color); padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                <h3 style="margin-top: 0; color: var(--primary-color);">Main Configuration</h3>
+                
+                <div class="toggle-row">
+                    <label for="dialogEnabled">Dialog Enabled</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="dialogEnabled">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <div class="toggle-row">
+                    <label for="onlineEnabled">Online Enable (Main switch)</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="onlineEnabled">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="section-group" style="background-color: var(--secondary-color); padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                <h3 style="margin-top: 0; color: var(--primary-color);">Dialog Content</h3>
+
+                <div class="form-group">
+                    <label for="dialogTitle">Title</label>
+                    <input type="text" id="dialogTitle" placeholder="e.g., Premium Login">
+                </div>
+                <div class="form-group">
+                    <label for="dialogDescriptions">Descriptions (one per line)</label>
+                    <textarea id="dialogDescriptions" rows="3" placeholder="e.g., Welcome to Premium Access."></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="dialogButtonLogin">Login Button Text</label>
+                    <input type="text" id="dialogButtonLogin" placeholder="e.g., Login">
+                </div>
+                <div class="form-group">
+                    <label for="dialogButtonAdmin">Admin Button Text</label>
+                    <input type="text" id="dialogButtonAdmin" placeholder="e.g., Admin">
+                </div>
+                <div class="form-group">
+                    <label for="dialogButtonCopy">Copy ID Button Text</label>
+                    <input type="text" id="dialogButtonCopy" placeholder="e.g., Copy ID">
+                </div>
+                <div class="form-group">
+                    <label for="dialogAdminUrl">Admin Contact URL</label>
+                    <input type="url" id="dialogAdminUrl" placeholder="https://t.me/your_contact">
+                </div>
+            </div>
+
+            <div style="text-align: right; margin-top: 20px;">
+                <button class="btn-primary" onclick="triggerSettingsUpdate()">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <nav>
+        <div class="nav-item active" id="navUsers" onclick="showTab('users')">
+            <i class="fas fa-users"></i>
+            <span>Users</span>
+        </div>
+        <div class="add-user-btn" onclick="showUserModal(null)">
+            <i class="fas fa-plus"></i>
+        </div>
+        <div class="nav-item" id="navSettings" onclick="showTab('settings')">
+            <i class="fas fa-cog"></i>
+            <span>Settings</span>
+        </div>
+    </nav>
+
+    <!-- User Add/Edit Modal (Updated for my.json structure) -->
+    <div id="userModal" class="modal">
+        <div class="modal-content">
+            <h2 id="userModalTitle">Add New User</h2>
+            <!-- Username field removed to match my.json structure -->
+            <div class="form-group">
+                <label for="deviceIdInput">Device ID</label>
+                <input type="text" id="deviceIdInput" placeholder="e.g., 8e3d64c8-3c99-..." required>
+            </div>
+            <div class="form-group">
+                <label for="passwordInput">Password</label>
+                <input type="text" id="passwordInput" placeholder="e.g., pass456" required>
+            </div>
+            
+            <label>Expiry Date (UTC)</label>
+            <div class="date-shortcuts">
+                <button onclick="setExpiryShortcut(1)">+1 Day</button>
+                <button onclick="setExpiryShortcut(7)">+7 Days</button>
+                <button onclick="setExpiryShortcut(30)">+30 Days</button>
+                <button onclick="setExpiryShortcut(90)">+3 Months</button>
+                <button onclick="setExpiryShortcut(365)">+1 Year</button>
+            </div>
+            <div class="form-group">
+                <input type="date" id="expiryDateInput" required>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; margin-top: 20px;">
+                <button class="btn-secondary" onclick="document.getElementById('userModal').style.display='none'">Cancel</button>
+                <button class="btn-primary" id="saveUserBtn">Save User</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Password Modal -->
+    <div id="passwordModal" class="modal">
+        <div class="modal-content">
+            <h2>Confirm Update</h2>
+            <p>Enter the admin password to confirm the update to Firebase.</p>
+            <div class="form-group">
+                <input type="password" id="adminPasswordInput" placeholder="Password" required>
+            </div>
+            <div style="display: flex; justify-content: flex-end; margin-top: 20px;">
+                <button class="btn-secondary" onclick="document.getElementById('passwordModal').style.display='none'; document.getElementById('adminPasswordInput').value = ''">Cancel</button>
+                <button class="btn-primary" id="confirmUpdateBtn">Confirm Update</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Confirm Modal -->
+    <div id="confirmModal" class="modal" style="justify-content: center; align-items: center;">
+        <div class="confirm-modal-content">
+            <p id="confirmMessage">Are you sure?</p>
+            <div class="confirm-buttons">
+                <button class="btn-confirm-secondary" id="confirmCancelBtn">Cancel</button>
+                <button class="btn-confirm-danger" id="confirmOkBtn">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading">
+        Loading...
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <!-- Firebase SDK Scripts -->
+    <script type="module">
+        // Import Firebase modules
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getDatabase, ref, get, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+        // ====================================================================
+        // CONFIGURATION
+        // ====================================================================
+        
+        // !!! PASTE YOUR FIREBASE CONFIG HERE !!!
+        // (Ei jaygay apnar Firebase project er config object ta paste korun)
+        // (Ei config object ta "Full_Setup_Guide.md" er Part 1 e peye jaben)
+        const firebaseConfig = {
+  apiKey: "AIzaSyAMKc_cJrQH9Hwd7v34gujZ19h1NH9eFtM",
+  authDomain: "yt-admin-64fef.firebaseapp.com",
+  databaseURL: "https://yt-admin-64fef-default-rtdb.firebaseio.com",
+  projectId: "yt-admin-64fef",
+  storageBucket: "yt-admin-64fef.firebasestorage.app",
+  messagingSenderId: "869475192785",
+  appId: "1:869475192785:web:b68fae2d60896cca95daf0",
+  measurementId: "G-2EFKGBX7Y8"
+};
+
+        // (Ei password ta apni icchamotoh change korte paren)
+        // (Eta holo apnar admin panel e save korar password)
+        const ADMIN_PASSWORD = "7878"; 
+
+        // Firebase initialization
+        let app, db, dbRef;
+        try {
+            app = initializeApp(firebaseConfig);
+            db = getDatabase(app);
+            // Amra root ("/") path e data store korbo
+            dbRef = ref(db, '/'); 
+        } catch (error) {
+            console.error("Firebase initialization error:", error);
+            showToast("Firebase Config Error. Check console.", 5000, true);
+        }
+
+        // Global state
+        // (configData ekhon apnar my.json er structure hold korbe)
+        let configData = {
+            dialog_enable: true,
+            online_enable: true,
+            title: "",
+            descriptions: [],
+            button_login: "Login",
+            button_admin: "Admin",
+            button_copy: "Copy ID",
+            admin_url: "",
+            device_section: []
+        };
+        
+        let currentEditingUserIndex = -1; // -1 for new user
+        let currentFilter = 'all';
+        let isDataLoaded = false;
+
+        // Utility Functions
+        const $ = id => document.getElementById(id);
+
+        function showToast(message, duration = 3000, isError = false) {
+            const toast = $('toast');
+            toast.textContent = message;
+            toast.style.backgroundColor = isError ? "var(--danger-color)" : "rgba(30,30,30,0.9)";
+            toast.style.color = "var(--text-color)";
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, duration);
+        }
+
+        // Custom Confirmation Modal (replaces alert/confirm)
+        function showConfirm(message, callback) {
+            $('confirmMessage').textContent = message;
+            const confirmModal = $('confirmModal');
+            confirmModal.style.display = 'flex';
+
+            $('confirmOkBtn').onclick = () => {
+                confirmModal.style.display = 'none';
+                callback(true);
+            };
+            $('confirmCancelBtn').onclick = () => {
+                confirmModal.style.display = 'none';
+                callback(false);
+            };
+        }
+
+        function showTab(tabName) {
+            $('usersTab').style.display = 'none';
+            $('settingsTab').style.display = 'none';
+            $('navUsers').classList.remove('active');
+            $('navSettings').classList.remove('active');
+
+            if (tabName === 'users') {
+                $('usersTab').style.display = 'block';
+                $('navUsers').classList.add('active');
+                if(isDataLoaded) renderUsers(); // Re-render only if data is loaded
+            } else if (tabName === 'settings') {
+                $('settingsTab').style.display = 'block';
+                $('navSettings').classList.add('active');
+                if(isDataLoaded) loadSettingsToForm(); // Load settings only if data is loaded
+            }
+        }
+        
+        function setFilter(filter, button) {
+            currentFilter = filter;
+            document.querySelectorAll('.filter-bar button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            if(button) button.classList.add('active');
+            renderUsers();
+        }
+
+        function isExpired(dateString) {
+            if (!dateString) return false;
+            try {
+                const expiryDate = new Date(dateString);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0); 
+                expiryDate.setDate(expiryDate.getDate() + 1); // Valid *through* expiry date
+                return expiryDate < today;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        /**
+         * Renders the users array (device_section) into the UI list
+         */
+        function renderUsers() {
+            if (!isDataLoaded) return; // Don't render if data isn't loaded
+            
+            const userList = $('userList');
+            userList.innerHTML = '';
+            
+            if (!configData.device_section || !Array.isArray(configData.device_section)) {
+                configData.device_section = [];
+            }
+            
+            let filteredUsers = configData.device_section.map((user, index) => ({
+                ...user,
+                originalIndex: index, // Store original index before filtering
+                is_expired: isExpired(user.expire_date) // (Field name changed)
+            }));
+            
+            if (currentFilter === 'valid') {
+                filteredUsers = filteredUsers.filter(user => !user.is_expired);
+            } else if (currentFilter === 'expired') {
+                filteredUsers = filteredUsers.filter(user => user.is_expired);
+            }
+
+            // Sort (Expired first, then by device_id)
+            filteredUsers.sort((a, b) => {
+                if (a.is_expired && !b.is_expired) return -1;
+                if (!a.is_expired && b.is_expired) return 1;
+                return (a.device_id || "").localeCompare(b.device_id || "");
+            });
+
+            if (filteredUsers.length === 0) {
+                userList.innerHTML = `<p style="color: var(--text-secondary); text-align: center;">No users found matching the filter: <b>${currentFilter.toUpperCase()}</b>.</p>`;
+                return;
+            }
+
+            filteredUsers.forEach((user) => {
+                const item = document.createElement('div');
+                item.className = 'user-item' + (user.is_expired ? ' expired' : ' valid');
+
+                const statusTag = user.is_expired 
+                    ? `<span class="user-status-tag">EXPIRED</span>`
+                    : `<span class="user-status-tag">VALID</span>`;
+
+                item.innerHTML = `
+                    <div style="display: flex; align-items: center; min-width: 0;">
+                        ${statusTag}
+                        <div class="user-item-info">
+                            <!-- Username removed, Device ID is primary -->
+                            <strong>Device ID: ${user.device_id || 'N/A'}</strong>
+                            <span>Password: ${user.password || 'N/A'}</span>
+                            <span>Expires: ${user.expire_date || 'N/A'}</span>
+                        </div>
+                    </div>
+                    <div class="user-actions">
+                        <button class="action-btn edit-btn" onclick="showUserModal(${user.originalIndex})" title="Edit">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="action-btn delete-btn" onclick="deleteUser(${user.originalIndex})" title="Delete">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </div>
+                `;
+                userList.appendChild(item);
+            });
+        }
+        
+        function setExpiryShortcut(days) {
+            const dateInput = $('expiryDateInput');
+            const today = new Date();
+            today.setDate(today.getDate() + days);
+            dateInput.value = today.toISOString().split('T')[0];
+        }
+
+        // --- Data Binding (Updated for my.json structure) ---
+        function loadSettingsToForm() {
+            if (!isDataLoaded) return;
+            $('dialogEnabled').checked = configData.dialog_enable || false;
+            $('onlineEnabled').checked = configData.online_enable || false;
+            $('dialogTitle').value = configData.title || '';
+            $('dialogDescriptions').value = (configData.descriptions || []).join('\n');
+            $('dialogButtonLogin').value = configData.button_login || '';
+            $('dialogButtonAdmin').value = configData.button_admin || '';
+            $('dialogButtonCopy').value = configData.button_copy || '';
+            $('dialogAdminUrl').value = configData.admin_url || '';
+        }
+
+        function extractSettingsFromForm() {
+            configData.dialog_enable = $('dialogEnabled').checked;
+            configData.online_enable = $('onlineEnabled').checked;
+            configData.title = $('dialogTitle').value.trim();
+            configData.descriptions = $('dialogDescriptions').value.split('\n').filter(line => line.trim() !== '');
+            configData.button_login = $('dialogButtonLogin').value.trim();
+            configData.button_admin = $('dialogButtonAdmin').value.trim();
+            configData.button_copy = $('dialogButtonCopy').value.trim();
+            configData.admin_url = $('dialogAdminUrl').value.trim();
+        }
+
+        // (showUserModal updated for my.json structure)
+        function showUserModal(index) {
+            const modalTitle = $('userModalTitle');
+            const userModal = $('userModal');
+
+            currentEditingUserIndex = (index !== undefined && index !== null) ? index : -1;
+
+            if (currentEditingUserIndex !== -1) {
+                modalTitle.textContent = 'Edit User';
+                const user = configData.device_section[currentEditingUserIndex];
+                $('deviceIdInput').value = user.device_id || '';
+                $('passwordInput').value = user.password || '';
+                $('expiryDateInput').value = user.expire_date || '';
+            } else {
+                modalTitle.textContent = 'Add New User';
+                $('deviceIdInput').value = '';
+                $('passwordInput').value = '';
+                setExpiryShortcut(30);
+            }
+            userModal.style.display = 'flex';
+        }
+
+        // (handleUserSaveAction updated for my.json structure)
+        function handleUserSaveAction() {
+            const device_id = $('deviceIdInput').value.trim();
+            const password = $('passwordInput').value.trim();
+            const expire_date = $('expiryDateInput').value;
+
+            if (!device_id || !password || !expire_date) {
+                showToast('All user fields are required.', 2000, true);
+                return;
+            }
+
+            const newUser = { device_id, password, expire_date };
+
+            if (currentEditingUserIndex !== -1) {
+                configData.device_section[currentEditingUserIndex] = newUser;
+            } else {
+                // Add to device_section
+                if (!configData.device_section) {
+                    configData.device_section = [];
+                }
+                configData.device_section.push(newUser);
+            }
+
+            // Don't render here, saveConfig will trigger a reload
+            $('userModal').style.display = 'none';
+            $('passwordModal').style.display = 'flex'; // Ask for password to save
+        }
+
+        // (deleteUser updated for my.json structure)
+        function deleteUser(index) {
+            if (!configData.device_section[index]) return;
+            const deviceId = configData.device_section[index].device_id;
+            
+            showConfirm(`Are you sure you want to delete the user: ${deviceId}?`, (confirmed) => {
+                if (confirmed) {
+                    configData.device_section.splice(index, 1);
+                    // Don't render here, saveConfig will trigger a reload
+                    showToast(`User marked for deletion. Confirm by entering password.`, 3000);
+                    $('passwordModal').style.display = 'flex';
+                }
+            });
+        }
+        
+        function triggerSettingsUpdate() {
+            extractSettingsFromForm();
+            $('passwordModal').style.display = 'flex';
+        }
+        
+        // --- FIREBASE FUNCTIONS (Replaced GitLab functions) ---
+
+        /**
+         * Loads the entire config from Firebase Realtime Database
+         */
+        function setupFirebaseListener() {
+            if (!db) {
+                showToast("Firebase is not initialized. Check config.", 5000, true);
+                return; 
+            }
+            
+            $('loading').style.display = 'flex';
+            $('loading').textContent = 'Loading from Firebase...';
+
+            // Use onValue for real-time updates
+            onValue(dbRef, (snapshot) => {
+                if (snapshot.exists()) {
+                    configData = snapshot.val();
+                    
+                    // Ensure core properties exist
+                    if (!configData.device_section) configData.device_section = [];
+                    if (!configData.descriptions) configData.descriptions = [];
+
+                } else {
+                    // If no data, use default structure (but don't save it yet)
+                    showToast('No data in Firebase. Using default structure.', 2000);
+                }
+                
+                if (!isDataLoaded) {
+                    // First load
+                    isDataLoaded = true;
+                    showToast('Configuration loaded from Firebase.', 2000);
+                } else {
+                    // Data updated in real-time
+                    showToast('Data synced with Firebase.', 1500);
+                }
+
+                // Refresh UI based on current tab
+                if ($('usersTab').style.display === 'block') {
+                    renderUsers();
+                } else if ($('settingsTab').style.display === 'block') {
+                    loadSettingsToForm();
+                }
+                
+                $('loading').style.display = 'none';
+
+            }, (error) => {
+                console.error('Error loading config from Firebase:', error);
+                showToast(`Failed to load config: ${error.message}`, 5000, true);
+                $('loading').style.display = 'none';
+            });
+        }
+
+        function handlePasswordConfirmation() {
+            const inputPassword = $('adminPasswordInput').value;
+            $('adminPasswordInput').value = '';
+
+            if (inputPassword === ADMIN_PASSWORD) {
+                $('passwordModal').style.display = 'none';
+                saveConfigToFirebase(); // Call Firebase save function
+            } else {
+                showToast('Incorrect Password. Update aborted.', 3000, true);
+            }
+        }
+
+        /**
+         * Saves the entire configData object to Firebase Realtime Database
+         */
+        async function saveConfigToFirebase() {
+            if (!db) {
+                showToast("Firebase is not initialized.", 3000, true);
+                return;
+            }
+            $('loading').style.display = 'flex';
+            $('loading').textContent = 'Saving to Firebase...';
+
+            try {
+                // 'configData' already holds the changes from (deleteUser, handleUserSaveAction, or triggerSettingsUpdate)
+                await set(dbRef, configData);
+                
+                // Don't show toast here, the onValue listener will fire and show "Data synced"
+                // showToast('Configuration saved to Firebase successfully!', 3000);
+
+            } catch (error) {
+                console.error('Error saving config to Firebase:', error);
+                showToast(`Failed to save config: ${error.message}`, 5000, true);
+            } finally {
+                // Loading will be hidden by the onValue listener
+            }
+        }
+        
+        // Globalize functions needed by HTML onclick attributes
+        window.showTab = showTab;
+        window.setFilter = setFilter;
+        window.showUserModal = showUserModal;
+        window.deleteUser = deleteUser;
+        window.setExpiryShortcut = setExpiryShortcut;
+        window.triggerSettingsUpdate = triggerSettingsUpdate;
+
+        // ====================================================================
+        // EVENT LISTENERS
+        // ====================================================================
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initialize Telegram App
+            try {
+                if (window.Telegram && window.Telegram.WebApp) {
+                    window.Telegram.WebApp.ready();
+                    window.Telegram.WebApp.expand();
+                }
+            } catch (e) {
+                console.warn("Telegram WebApp script not found or failed. Running in browser.");
+            }
+            
+            setupFirebaseListener(); // Start listening for data
+            showTab('users'); // Show users tab by default
+            $('saveUserBtn').addEventListener('click', handleUserSaveAction);
+            $('confirmUpdateBtn').addEventListener('click', handlePasswordConfirmation);
+        });
+    
+    </script>
+</body>
+</html>
